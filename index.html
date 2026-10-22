@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Debt Reminder & Email Generator - Kärcher Style</title>
-    <!-- Tailwind CSS -->
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- SheetJS (Thư viện đọc file Excel) -->
+    <!-- SheetJS (Đọc file Excel) -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     
     <script>
@@ -18,84 +18,337 @@
             theme: {
                 extend: {
                     colors: {
-                        karcher: { yellow: '#FFED00', darkyellow: '#e6d500', black: '#212121' }
+                        karcher: {
+                            yellow: '#FFED00',
+                            darkyellow: '#e6d500',
+                            black: '#212121',
+                            gray: '#737373',
+                            lightbg: '#f8fafc'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
                     }
                 }
             }
         }
     </script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
 </head>
 <body class="bg-slate-100 font-sans text-slate-800 min-h-screen flex flex-col">
 
     <!-- Header / Navbar -->
     <header class="bg-karcher-black text-white shadow-md sticky top-0 z-30">
-        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center space-x-3">
-                <div class="bg-karcher-yellow text-karcher-black font-extrabold px-3 py-1 rounded text-lg">KÄRCHER</div>
+                <div class="bg-karcher-yellow text-karcher-black font-extrabold px-3 py-1 rounded text-lg tracking-wider">
+                    KÄRCHER
+                </div>
                 <h1 class="text-lg font-semibold border-l border-slate-700 pl-3 text-slate-200 hidden sm:block">
                     Công cụ Quản lý & Nhắc nợ Công nợ Quá hạn
                 </h1>
             </div>
-            <div class="flex items-center space-x-2">
-                <!-- NÚT TẢI FILE EXCEL/CSV MỚI THÊM -->
-                <label class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm px-3 py-2 rounded-lg font-semibold cursor-pointer transition flex items-center gap-2 shadow">
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                <!-- NÚT TẢI FILE EXCEL/CSV -->
+                <label class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm px-3 py-2 rounded-lg font-semibold cursor-pointer transition flex items-center gap-2 shadow-sm">
                     <i class="fa-solid fa-file-import"></i>
                     <span>Tải file Excel/CSV</span>
                     <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" onchange="handleFileUpload(event)" class="hidden">
                 </label>
+
                 <button onclick="exportToCSV()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm px-3 py-2 rounded-lg border border-slate-600 transition flex items-center gap-2">
                     <i class="fa-solid fa-file-excel text-emerald-400"></i>
                     <span>Xuất CSV</span>
+                </button>
+                <button onclick="openAddModal()" class="bg-karcher-yellow hover:bg-karcher-darkyellow text-karcher-black font-semibold text-xs sm:text-sm px-3 py-2 rounded-lg transition flex items-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Thêm khoản nợ</span>
                 </button>
             </div>
         </div>
     </header>
 
-    <!-- Content Table & Preview Area -->
-    <main class="max-w-7xl mx-auto px-4 py-6 flex-grow w-full grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Left Column: Data Management (7 Cols) -->
         <section class="lg:col-span-7 flex flex-col space-y-4">
-            <div class="bg-white p-4 rounded-xl shadow-sm border flex justify-between items-center">
-                <input type="text" id="searchInput" oninput="renderTable()" placeholder="Tìm theo Mã KH, Tên KH, Số HĐ..." class="w-full p-2 border rounded-lg text-sm">
-            </div>
-            <div class="bg-white rounded-xl shadow-sm border overflow-hidden flex-grow">
-                <div class="p-3.5 bg-slate-50 border-b flex justify-between items-center">
-                    <h2 class="text-sm font-bold text-slate-700 uppercase">Danh sách công nợ (<span id="rowCount">0</span>)</h2>
+            
+            <!-- Filter & Search Card -->
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-3 items-center justify-between">
+                <div class="relative flex-1 min-w-[200px]">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                    <input type="text" id="searchInput" oninput="renderTable()" placeholder="Tìm theo Mã KH, Tên KH, Số HĐ..." 
+                        class="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
                 </div>
-                <div class="overflow-auto max-h-[500px]">
-                    <table class="w-full text-left text-xs">
-                        <thead class="bg-slate-100 text-slate-600 uppercase font-semibold sticky top-0">
+                <div class="flex items-center gap-2">
+                    <select id="filterCustomer" onchange="renderTable()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white max-w-[200px]">
+                        <option value="">-- Tất cả khách hàng --</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Summary KPI Cards -->
+            <div class="grid grid-cols-3 gap-3">
+                <div class="bg-white p-3.5 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-blue-500">
+                    <p class="text-xs text-slate-500 font-medium">Tổng số khoản nợ</p>
+                    <p id="kpiTotalItems" class="text-lg font-bold text-slate-800 mt-1">0</p>
+                </div>
+                <div class="bg-white p-3.5 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-amber-500">
+                    <p class="text-xs text-slate-500 font-medium">Khách hàng chọn</p>
+                    <p id="kpiSelectedCustomer" class="text-xs font-bold text-slate-800 mt-1 truncate">Chưa chọn</p>
+                </div>
+                <div class="bg-white p-3.5 rounded-xl shadow-sm border border-slate-200 border-l-4 border-l-red-500">
+                    <p class="text-xs text-slate-500 font-medium">Tổng dư nợ chọn</p>
+                    <p id="kpiTotalBalance" class="text-base font-extrabold text-red-600 mt-1">0 đ</p>
+                </div>
+            </div>
+
+            <!-- Table Card -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col flex-grow">
+                <div class="p-3.5 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                    <h2 class="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-amber-500"></i>
+                        Danh sách công nợ ({ <span id="rowCount">0</span> })
+                    </h2>
+                    <span class="text-xs text-slate-500">Tích chọn để xem mẫu Email</span>
+                </div>
+                
+                <div class="overflow-x-auto overflow-y-auto max-h-[500px] flex-grow">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="bg-slate-100 text-slate-600 uppercase font-semibold sticky top-0 z-10 border-b border-slate-200">
                             <tr>
-                                <th class="p-2.5 text-center"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"></th>
-                                <th class="p-2.5">Code</th>
-                                <th class="p-2.5">Khách hàng</th>
-                                <th class="p-2.5">Hợp đồng</th>
-                                <th class="p-2.5 text-right">Còn lại (VND)</th>
+                                <th class="p-2.5 text-center w-8">
+                                    <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)" class="rounded text-amber-500 focus:ring-amber-400 cursor-pointer">
+                                </th>
+                                <th class="p-2.5">CODE</th>
+                                <th class="p-2.5 min-w-[150px]">KHÁCH HÀNG</th>
+                                <th class="p-2.5">HỢP ĐỒNG</th>
+                                <th class="p-2.5 text-right">CÒN LẠI (VND)</th>
+                                <th class="p-2.5 text-center">QUÁ HẠN</th>
+                                <th class="p-2.5 text-center">THAO TÁC</th>
                             </tr>
                         </thead>
-                        <tbody id="debtTableBody" class="divide-y divide-slate-100"></tbody>
+                        <tbody id="debtTableBody" class="divide-y divide-slate-100">
+                            <!-- Rows rendered by JS -->
+                        </tbody>
                     </table>
                 </div>
             </div>
         </section>
 
-        <!-- Preview Email -->
-        <section class="lg:col-span-5">
-            <div class="bg-white rounded-xl shadow-sm border p-4">
-                <h2 class="font-bold text-sm mb-2"><i class="fa-solid fa-envelope-open-text text-amber-500"></i> Xem trước Email</h2>
-                <div id="emailPreviewContent" class="text-xs border p-3 rounded bg-slate-50 max-h-[500px] overflow-y-auto">
-                    Chưa có dữ liệu. Vui lòng chọn khoản nợ hoặc tải tệp lên.
+        <!-- Right Column: Email Preview & Generator (5 Cols) -->
+        <section class="lg:col-span-5 flex flex-col space-y-4">
+            
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
+                <!-- Controls Header -->
+                <div class="p-4 bg-slate-800 text-white flex flex-col gap-3">
+                    <div class="flex items-center justify-between">
+                        <h2 class="font-bold text-sm flex items-center gap-2">
+                            <i class="fa-solid fa-envelope-open-text text-karcher-yellow"></i>
+                            Xem trước Email Nhắc Nợ
+                        </h2>
+                        <span id="reminderCountBadge" class="bg-amber-500 text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+                            Lần 2
+                        </span>
+                    </div>
+
+                    <!-- Config inputs for Email -->
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                            <label class="text-slate-400 block mb-1">Số lần nhắc:</label>
+                            <select id="reminderTimes" onchange="updateEmailPreview()" class="w-full bg-slate-700 text-white rounded p-1.5 border border-slate-600">
+                                <option value="1">Lần 1</option>
+                                <option value="2" selected>Lần 2</option>
+                                <option value="3">Lần 3 (Cảnh báo cao)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-slate-400 block mb-1">Số ngày quá hạn:</label>
+                            <input type="number" id="overdueDaysInput" value="31" oninput="updateEmailPreview()" class="w-full bg-slate-700 text-white rounded p-1.5 border border-slate-600">
+                        </div>
+                    </div>
                 </div>
-                <button onclick="copyEmailHTML()" class="w-full mt-3 bg-karcher-yellow text-karcher-black font-bold py-2 rounded shadow">
-                    Sao chép Nội dung Email
-                </button>
+
+                <!-- Email Subject Line -->
+                <div class="bg-slate-100 p-3 border-b border-slate-200 text-xs">
+                    <span class="font-semibold text-slate-500">Tiêu đề Email:</span>
+                    <p id="emailSubject" class="font-bold text-slate-800 mt-0.5 break-words">
+                        THÔNG BÁO NHẮC THANH TOÁN CÔNG NỢ QUÁ HẠN
+                    </p>
+                </div>
+
+                <!-- Email Body Render Box -->
+                <div class="p-4 overflow-y-auto max-h-[550px] bg-white flex-grow text-slate-800 text-xs leading-relaxed" id="emailBodyContainer">
+                    <div id="emailPreviewContent" class="space-y-3">
+                        <!-- Simulated Email HTML -->
+                    </div>
+                </div>
+
+                <!-- Footer Action Buttons -->
+                <div class="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2">
+                    <button onclick="copyEmailHTML()" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-2 px-3 rounded-lg text-xs transition flex items-center justify-center gap-1.5">
+                        <i class="fa-regular fa-copy"></i>
+                        <span>Sao chép Nội dung</span>
+                    </button>
+                    <button onclick="openMailClient()" class="flex-1 bg-karcher-yellow hover:bg-karcher-darkyellow text-karcher-black font-bold py-2 px-3 rounded-lg text-xs transition flex items-center justify-center gap-1.5 shadow">
+                        <i class="fa-solid fa-paper-plane"></i>
+                        <span>Mở Gmail / Outlook</span>
+                    </button>
+                </div>
             </div>
+
         </section>
+
     </main>
 
-    <script>
-        let debtData = [];
+    <!-- Modal Add/Edit Debt Item -->
+    <div id="debtModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-lg overflow-hidden">
+            <div class="bg-slate-800 text-white p-4 flex justify-between items-center">
+                <h3 id="modalTitle" class="font-bold text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-plus-circle text-karcher-yellow"></i>
+                    Thêm khoản nợ mới
+                </h3>
+                <button onclick="closeAddModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            
+            <form id="debtForm" onsubmit="saveDebtItem(event)" class="p-4 grid grid-cols-2 gap-3 text-xs">
+                <input type="hidden" id="editIndex" value="-1">
+                
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Mã KH (Code) *</label>
+                    <input type="text" id="inputCode" required class="w-full border rounded p-2 focus:ring-2 focus:ring-amber-400 outline-none" placeholder="CB005908">
+                </div>
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Tên Khách Hàng *</label>
+                    <input type="text" id="inputCustomer" required class="w-full border rounded p-2 focus:ring-2 focus:ring-amber-400 outline-none" placeholder="CÔNG TY TNHH EPOS HOTELS...">
+                </div>
 
-        // Hàm đọc File Excel/CSV từ Fast
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Sales man</label>
+                    <input type="text" id="inputSalesman" class="w-full border rounded p-2 focus:ring-2 focus:ring-amber-400 outline-none" placeholder="TIÊN-PRO">
+                </div>
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Code sales man</label>
+                    <input type="text" id="inputCodeSalesman" class="w-full border rounded p-2 focus:ring-2 focus:ring-amber-400 outline-none" placeholder="EB123">
+                </div>
+
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Bộ phận (Dept)</label>
+                    <input type="text" id="inputDept" class="w-full border rounded p-2 focus:ring-2 focus:ring-amber-400 outline-none" placeholder="DN-HOS">
+                </div>
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Số hợp đồng (Contract No)</label>
+                    <input type="text" id="inputContractNo" class="w-full border rounded p-2 focus:ring-2 focus:ring-amber-400 outline-none" placeholder="hợp đồng số 06072026/HDMB...">
+                </div>
+
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Giá trị sau thuế (After Tax)</label>
+                    <input type="number" id="inputAfterTax" required class="w-full border rounded p-2 focus:ring-2 focus:ring-amber-400 outline-none" placeholder="72460000">
+                </div>
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Số tiền còn lại (Balance)</label>
+                    <input type="number" id="inputBalance" required class="w-full border rounded p-2 focus:ring-2 focus:ring-amber-400 outline-none" placeholder="35185001">
+                </div>
+
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Số hóa đơn (Invoice No)</label>
+                    <input type="text" id="inputInvoiceNo" class="w-full border rounded p-2 focus:ring-2 focus:ring-amber-400 outline-none" placeholder="7075">
+                </div>
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Email Khách hàng</label>
+                    <input type="email" id="inputCustomerEmail" class="w-full border rounded p-2 focus:ring-2 focus:ring-amber-400 outline-none" placeholder="accountant@epos.com">
+                </div>
+
+                <div class="col-span-2 mt-3 flex justify-end gap-2 border-t pt-3">
+                    <button type="button" onclick="closeAddModal()" class="px-4 py-2 rounded bg-slate-200 hover:bg-slate-300 font-medium text-slate-700">Hủy</button>
+                    <button type="submit" class="px-4 py-2 rounded bg-karcher-yellow hover:bg-karcher-darkyellow font-bold text-karcher-black shadow">Lưu thông tin</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-slate-800 text-white px-4 py-2.5 rounded-lg shadow-lg hidden items-center gap-2 text-xs z-50 border border-slate-700">
+        <i class="fa-solid fa-circle-check text-emerald-400 text-sm"></i>
+        <span id="toastMsg">Thông báo</span>
+    </div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // Default Sample Data
+        let debtData = [
+            {
+                code: "CB005908",
+                customer: "CÔNG TY TNHH EPOS HOTELS - CHI NHÁNH NHA TRANG",
+                salesman: "TIÊN-PRO",
+                codeSalesman: "EB123",
+                dept: "DN-HOS",
+                contractNo: "hợp đồng số 06072026/HDMB/KARCHER- EPOSNT",
+                afterTax: 72460000,
+                balanceAmount: 35185001,
+                invoiceNo: "7075",
+                email: "acc5@epos.com",
+                selected: true
+            },
+            {
+                code: "CB005908",
+                customer: "CÔNG TY TNHH EPOS HOTELS - CHI NHÁNH NHA TRANG",
+                salesman: "TIÊN-PRO",
+                codeSalesman: "EB123",
+                dept: "DN-HOS",
+                contractNo: "hợp đồng số 06072026/HDMB/KARCHER- EPOSNT",
+                afterTax: 2090000,
+                balanceAmount: 2090000,
+                invoiceNo: "7076",
+                email: "acc5@epos.com",
+                selected: true
+            },
+            {
+                code: "CB005908",
+                customer: "CÔNG TY TNHH EPOS HOTELS - CHI NHÁNH NHA TRANG",
+                salesman: "TIÊN-PRO",
+                codeSalesman: "EB123",
+                dept: "DN-HOS",
+                contractNo: "HỢP ĐỒNG SỐ 10072026/HDMB/KARCHER-EPOSNT",
+                afterTax: 27990000,
+                balanceAmount: 13995000,
+                invoiceNo: "7077",
+                email: "acc5@epos.com",
+                selected: true
+            },
+            {
+                code: "CB008892",
+                customer: "CÔNG TY CỔ PHẦN ĐẦU TƯ THƯƠNG MẠI SÀI GÒN",
+                salesman: "NAM-SALES",
+                codeSalesman: "EB456",
+                dept: "SG-RET",
+                contractNo: "HĐMB-2026-SG01",
+                afterTax: 15000000,
+                balanceAmount: 15000000,
+                invoiceNo: "8812",
+                email: "ketoan@saigontrade.com",
+                selected: false
+            }
+        ];
+
+        function formatVND(amount) {
+            return new Intl.NumberFormat('vi-VN').format(amount);
+        }
+
+        window.onload = function() {
+            populateCustomerDropdown();
+            renderTable();
+            updateEmailPreview();
+        };
+
+        // Đọc tệp Excel xuất từ Fast
         function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -108,48 +361,88 @@
                 const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
 
                 debtData = [];
-                // Quét từ dòng 3 (index 2) bỏ qua tiêu đề file Fast
                 for (let i = 2; i < jsonData.length; i++) {
                     const row = jsonData[i];
-                    if (row && row[4]) { // Kiểm tra có Mã KH
+                    if (row && row[4] && row[4] !== "Mã khách") {
                         debtData.push({
                             code: row[4] || '',
                             customer: row[5] || '',
                             salesman: row[16] || '',
                             codeSalesman: row[15] || '',
-                            dept: 'SALES',
+                            dept: 'DN-HOS',
                             contractNo: row[6] || row[3] || '',
                             afterTax: Number(row[7]) || 0,
                             balanceAmount: Number(row[9]) || Number(row[7]) || 0,
                             invoiceNo: row[3] || '',
                             email: row[17] || '',
-                            selected: true
+                            selected: false
                         });
                     }
                 }
+
+                populateCustomerDropdown();
                 renderTable();
-                alert("Đã tải tệp công nợ thành công!");
+                showToast(`Đã tải thành công ${debtData.length} khoản nợ từ tệp!`);
             };
             reader.readAsArrayBuffer(file);
         }
 
-        function formatVND(amt) { return new Intl.NumberFormat('vi-VN').format(amt); }
+        function populateCustomerDropdown() {
+            const dropdown = document.getElementById('filterCustomer');
+            const customers = [...new Set(debtData.map(item => item.customer))];
+            
+            dropdown.innerHTML = '<option value="">-- Tất cả khách hàng --</option>';
+            customers.forEach(cust => {
+                if (cust) {
+                    const opt = document.createElement('option');
+                    opt.value = cust;
+                    opt.textContent = cust;
+                    dropdown.appendChild(opt);
+                }
+            });
+        }
 
         function renderTable() {
             const tbody = document.getElementById('debtTableBody');
+            const searchVal = document.getElementById('searchInput').value.toLowerCase();
+            const filterCust = document.getElementById('filterCustomer').value;
+            
             tbody.innerHTML = '';
+            let totalItems = 0;
+
             debtData.forEach((item, index) => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td class="p-2.5 text-center"><input type="checkbox" ${item.selected ? 'checked' : ''} onchange="toggleSelect(${index})"></td>
-                    <td class="p-2.5 font-medium">${item.code}</td>
-                    <td class="p-2.5 font-semibold">${item.customer}</td>
-                    <td class="p-2.5">${item.contractNo}</td>
-                    <td class="p-2.5 text-right font-bold text-red-600">${formatVND(item.balanceAmount)}</td>
-                `;
-                tbody.appendChild(tr);
+                const matchesSearch = item.code.toLowerCase().includes(searchVal) || 
+                                     item.customer.toLowerCase().includes(searchVal) ||
+                                     item.contractNo.toString().toLowerCase().includes(searchVal);
+                const matchesCust = filterCust === "" || item.customer === filterCust;
+
+                if (matchesSearch && matchesCust) {
+                    totalItems++;
+                    const tr = document.createElement('tr');
+                    tr.className = item.selected ? 'bg-amber-50/60 hover:bg-amber-50' : 'hover:bg-slate-50';
+                    
+                    tr.innerHTML = `
+                        <td class="p-2.5 text-center">
+                            <input type="checkbox" ${item.selected ? 'checked' : ''} onchange="toggleSelect(${index})" class="rounded text-amber-500 focus:ring-amber-400 cursor-pointer">
+                        </td>
+                        <td class="p-2.5 font-medium text-slate-700">${item.code}</td>
+                        <td class="p-2.5 font-semibold text-slate-800">${item.customer}</td>
+                        <td class="p-2.5 text-slate-600 truncate max-w-[180px]" title="${item.contractNo}">${item.contractNo}</td>
+                        <td class="p-2.5 text-right font-bold text-red-600">${formatVND(item.balanceAmount)}</td>
+                        <td class="p-2.5 text-center"><span class="px-1.5 py-0.5 rounded text-[10px] bg-red-100 text-red-700 font-semibold">Quá hạn</span></td>
+                        <td class="p-2.5 text-center space-x-1">
+                            <button onclick="editDebtItem(${index})" class="text-slate-500 hover:text-blue-600 p-1"><i class="fa-solid fa-pen"></i></button>
+                            <button onclick="deleteDebtItem(${index})" class="text-slate-500 hover:text-red-600 p-1"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                }
             });
-            document.getElementById('rowCount').textContent = debtData.length;
+
+            document.getElementById('rowCount').textContent = totalItems;
+            document.getElementById('kpiTotalItems').textContent = debtData.length;
+            
+            updateKPIs();
             updateEmailPreview();
         }
 
@@ -158,37 +451,262 @@
             renderTable();
         }
 
-        function toggleSelectAll(master) {
-            debtData.forEach(item => item.selected = master.checked);
+        function toggleSelectAll(masterCheckbox) {
+            const isChecked = masterCheckbox.checked;
+            const filterCust = document.getElementById('filterCustomer').value;
+            const searchVal = document.getElementById('searchInput').value.toLowerCase();
+
+            debtData.forEach(item => {
+                const matchesSearch = item.code.toLowerCase().includes(searchVal) || 
+                                     item.customer.toLowerCase().includes(searchVal) ||
+                                     item.contractNo.toString().toLowerCase().includes(searchVal);
+                const matchesCust = filterCust === "" || item.customer === filterCust;
+                if (matchesSearch && matchesCust) {
+                    item.selected = isChecked;
+                }
+            });
             renderTable();
         }
 
+        function updateKPIs() {
+            const selectedItems = debtData.filter(d => d.selected);
+            const totalBalance = selectedItems.reduce((sum, item) => sum + Number(item.balanceAmount), 0);
+            
+            document.getElementById('kpiTotalBalance').textContent = formatVND(totalBalance) + ' đ';
+
+            if (selectedItems.length > 0) {
+                const customerNames = [...new Set(selectedItems.map(i => i.customer))];
+                if (customerNames.length === 1) {
+                    document.getElementById('kpiSelectedCustomer').textContent = customerNames[0];
+                } else {
+                    document.getElementById('kpiSelectedCustomer').textContent = `${customerNames.length} Khách hàng được chọn`;
+                }
+            } else {
+                document.getElementById('kpiSelectedCustomer').textContent = "Chưa chọn";
+            }
+        }
+
         function updateEmailPreview() {
-            const selected = debtData.filter(d => d.selected);
-            const container = document.getElementById('emailPreviewContent');
-            if (selected.length === 0) {
-                container.innerHTML = "Vui lòng chọn ít nhất 1 khoản nợ.";
+            const selectedItems = debtData.filter(d => d.selected);
+            const emailContainer = document.getElementById('emailPreviewContent');
+            const reminderTimes = document.getElementById('reminderTimes').value;
+            const overdueDays = document.getElementById('overdueDaysInput').value;
+            const subjectEl = document.getElementById('emailSubject');
+
+            document.getElementById('reminderCountBadge').textContent = `Lần ${reminderTimes}`;
+
+            if (selectedItems.length === 0) {
+                subjectEl.textContent = "THÔNG BÁO NHẮC THANH TOÁN CÔNG NỢ QUÁ HẠN";
+                emailContainer.innerHTML = `
+                    <div class="text-center py-12 text-slate-400">
+                        <i class="fa-solid fa-inbox text-4xl mb-2"></i>
+                        <p>Vui lòng tích chọn ít nhất 1 khoản nợ trong bảng để tạo mẫu Email nhắc nợ.</p>
+                    </div>
+                `;
                 return;
             }
-            let total = selected.reduce((s, i) => s + i.balanceAmount, 0);
-            container.innerHTML = `
-                <p><b>Kính gửi Quý Công ty,</b></p>
-                <p>Cảm ơn Quý khách đã hợp tác cùng KÄRCHER. Chi tiết công nợ quá hạn như sau:</p>
-                <table border="1" style="width:100%; border-collapse:collapse; margin:10px 0;">
-                    <tr style="background:#FFED00;"><th>Code</th><th>Customer</th><th>Contract</th><th>Balance</th></tr>
-                    ${selected.map(i => `<tr><td>${i.code}</td><td>${i.customer}</td><td>${i.contractNo}</td><td align="right">${formatVND(i.balanceAmount)}</td></tr>`).join('')}
-                    <tr style="background:#FFED00; font-weight:bold;"><td colspan="3">TỔNG NỢ</td><td align="right" style="color:red;">${formatVND(total)}</td></tr>
-                </table>
+
+            const customerName = selectedItems[0].customer;
+            const totalBalance = selectedItems.reduce((sum, i) => sum + Number(i.balanceAmount), 0);
+
+            subjectEl.textContent = `THÔNG BÁO NHẮC THANH TOÁN CÔNG NỢ QUÁ HẠN - ${customerName} (lần ${reminderTimes})`;
+
+            let rowsHtml = '';
+            selectedItems.forEach(item => {
+                rowsHtml += `
+                    <tr style="border-bottom: 1px solid #000;">
+                        <td style="padding: 6px; border-right: 1px solid #000; text-align: center;">${item.code}</td>
+                        <td style="padding: 6px; border-right: 1px solid #000;">${item.customer}</td>
+                        <td style="padding: 6px; border-right: 1px solid #000; font-weight: bold;">${item.salesman}</td>
+                        <td style="padding: 6px; border-right: 1px solid #000;">${item.codeSalesman}</td>
+                        <td style="padding: 6px; border-right: 1px solid #000;">${item.dept}</td>
+                        <td style="padding: 6px; border-right: 1px solid #000;">${item.contractNo}</td>
+                        <td style="padding: 6px; border-right: 1px solid #000; text-align: right;">${formatVND(item.afterTax)}</td>
+                        <td style="padding: 6px; border-right: 1px solid #000; text-align: right; font-weight: bold;">${formatVND(item.balanceAmount)}</td>
+                        <td style="padding: 6px; text-align: center;">${item.invoiceNo}</td>
+                    </tr>
+                `;
+            });
+
+            const emailTemplate = `
+                <div style="font-family: Arial, sans-serif; font-size: 13px; color: #000; line-height: 1.5;">
+                    <p>Kính gửi Quý Công ty,</p>
+                    <p style="margin-top: 10px;">Trước tiên, chúng tôi xin cảm ơn Quý Công ty đã luôn tin tưởng và hợp tác cùng <strong>CÔNG TY TNHH MTV KARCHER</strong>.</p>
+                    <p style="margin-top: 10px;">Theo đối chiếu công nợ của chúng tôi, hiện tại Quý Công ty vẫn còn một số khoản công nợ quá hạn chưa được thanh toán, chi tiết như sau:</p>
+
+                    <div style="overflow-x: auto; margin-top: 15px; margin-bottom: 15px;">
+                        <table style="width: 100%; border-collapse: collapse; border: 2px solid #000; font-size: 11px;">
+                            <thead>
+                                <tr style="background-color: #FFED00; color: #000; font-weight: bold; border-bottom: 2px solid #000;">
+                                    <th style="padding: 8px 4px; border-right: 1px solid #000; text-align: center;">Code</th>
+                                    <th style="padding: 8px 4px; border-right: 1px solid #000; text-align: center;">Customer</th>
+                                    <th style="padding: 8px 4px; border-right: 1px solid #000; text-align: center;">Sales man</th>
+                                    <th style="padding: 8px 4px; border-right: 1px solid #000; text-align: center;">Code sale man</th>
+                                    <th style="padding: 8px 4px; border-right: 1px solid #000; text-align: center;">Dept</th>
+                                    <th style="padding: 8px 4px; border-right: 1px solid #000; text-align: center;">Contract No</th>
+                                    <th style="padding: 8px 4px; border-right: 1px solid #000; text-align: center;">After tax</th>
+                                    <th style="padding: 8px 4px; border-right: 1px solid #000; text-align: center;">Balance amount</th>
+                                    <th style="padding: 8px 4px; text-align: center;">Invoice No.</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rowsHtml}
+                                <tr style="background-color: #FFED00; font-weight: bold; border-top: 2px solid #000;">
+                                    <td colspan="5" style="border-right: 1px solid #000;"></td>
+                                    <td style="padding: 8px; border-right: 1px solid #000; color: #d00000;">TỔNG SỐ TIỀN CẦN THANH TOÁN</td>
+                                    <td style="border-right: 1px solid #000;"></td>
+                                    <td style="padding: 8px; border-right: 1px solid #000; text-align: right; color: #d00000;">${formatVND(totalBalance)}</td>
+                                    <td></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p>Theo điều khoản thanh toán đã thỏa thuận giữa hai bên, các khoản công nợ trên đã quá hạn thanh toán <strong>${overdueDays} ngày</strong>. Tuy nhiên, đến thời điểm hiện tại, chúng tôi vẫn chưa nhận được khoản thanh toán từ Quý Công ty mặc dù đã nhắc nhở từ trước.</p>
+                    <p style="margin-top: 10px;">Kính mong Quý Công ty vui lòng kiểm tra và sắp xếp thanh toán trong thời gian sớm nhất.</p>
+                    <p style="margin-top: 10px;">Rất mong nhận được sự hỗ trợ và hợp tác từ Quý Công ty.</p>
+                    
+                    <p style="margin-top: 15px;">Kind regards,</p>
+
+                    <div style="margin-top: 15px; font-size: 12px; color: #333;">
+                        <p style="font-weight: bold; color: #000; margin-bottom: 2px;">Tracy Tran</p>
+                        <p style="color: #666; margin: 0;">Senior Accountant</p>
+                        <p style="color: #666; margin: 0;">Finance & Supply Chain</p>
+                        <p style="color: #666; margin: 0;">Phone: <a href="tel:+84901404799" style="color: #0284c7; text-decoration: none;">+84901404799</a></p>
+                    </div>
+                </div>
             `;
+
+            emailContainer.innerHTML = emailTemplate;
+        }
+
+        function openAddModal() {
+            document.getElementById('editIndex').value = "-1";
+            document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-plus-circle text-karcher-yellow"></i> Thêm khoản nợ mới';
+            document.getElementById('debtForm').reset();
+            document.getElementById('debtModal').classList.remove('hidden');
+            document.getElementById('debtModal').classList.add('flex');
+        }
+
+        function closeAddModal() {
+            document.getElementById('debtModal').classList.add('hidden');
+            document.getElementById('debtModal').classList.remove('flex');
+        }
+
+        function saveDebtItem(event) {
+            event.preventDefault();
+            const editIdx = parseInt(document.getElementById('editIndex').value);
+            
+            const newItem = {
+                code: document.getElementById('inputCode').value,
+                customer: document.getElementById('inputCustomer').value,
+                salesman: document.getElementById('inputSalesman').value,
+                codeSalesman: document.getElementById('inputCodeSalesman').value,
+                dept: document.getElementById('inputDept').value,
+                contractNo: document.getElementById('inputContractNo').value,
+                afterTax: Number(document.getElementById('inputAfterTax').value),
+                balanceAmount: Number(document.getElementById('inputBalance').value),
+                invoiceNo: document.getElementById('inputInvoiceNo').value,
+                email: document.getElementById('inputCustomerEmail').value,
+                selected: true
+            };
+
+            if (editIdx >= 0) {
+                debtData[editIdx] = newItem;
+                showToast("Đã cập nhật thông tin khoản nợ!");
+            } else {
+                debtData.push(newItem);
+                showToast("Đã thêm khoản nợ mới!");
+            }
+
+            closeAddModal();
+            populateCustomerDropdown();
+            renderTable();
+        }
+
+        function editDebtItem(index) {
+            const item = debtData[index];
+            document.getElementById('editIndex').value = index;
+            document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-pen-to-square text-karcher-yellow"></i> Chỉnh sửa khoản nợ';
+            
+            document.getElementById('inputCode').value = item.code;
+            document.getElementById('inputCustomer').value = item.customer;
+            document.getElementById('inputSalesman').value = item.salesman;
+            document.getElementById('inputCodeSalesman').value = item.codeSalesman;
+            document.getElementById('inputDept').value = item.dept;
+            document.getElementById('inputContractNo').value = item.contractNo;
+            document.getElementById('inputAfterTax').value = item.afterTax;
+            document.getElementById('inputBalance').value = item.balanceAmount;
+            document.getElementById('inputInvoiceNo').value = item.invoiceNo;
+            document.getElementById('inputCustomerEmail').value = item.email || '';
+
+            document.getElementById('debtModal').classList.remove('hidden');
+            document.getElementById('debtModal').classList.add('flex');
+        }
+
+        function deleteDebtItem(index) {
+            if (confirm("Bạn có chắc chắn muốn xóa khoản nợ này?")) {
+                debtData.splice(index, 1);
+                populateCustomerDropdown();
+                renderTable();
+                showToast("Đã xóa khoản nợ!");
+            }
         }
 
         function copyEmailHTML() {
+            const container = document.getElementById('emailPreviewContent');
+            if (!container || debtData.filter(d => d.selected).length === 0) {
+                showToast("Không có nội dung email để sao chép!");
+                return;
+            }
+
             const range = document.createRange();
-            range.selectNode(document.getElementById('emailPreviewContent'));
+            range.selectNode(container);
             window.getSelection().removeAllRanges();
             window.getSelection().addRange(range);
-            document.execCommand('copy');
-            alert("Đã sao chép nội dung Email!");
+
+            try {
+                document.execCommand('copy');
+                showToast("Đã sao chép nội dung Email!");
+            } catch (err) {
+                showToast("Lỗi khi sao chép!");
+            }
+            window.getSelection().removeAllRanges();
+        }
+
+        function openMailClient() {
+            const selectedItems = debtData.filter(d => d.selected);
+            if (selectedItems.length === 0) {
+                showToast("Vui lòng chọn khách hàng để gửi email!");
+                return;
+            }
+
+            const recipient = selectedItems[0].email || '';
+            const subject = encodeURIComponent(document.getElementById('emailSubject').textContent.trim());
+            window.open(`mailto:${recipient}?subject=${subject}`, '_blank');
+        }
+
+        function exportToCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFFCode,Customer,Salesman,CodeSalesman,Dept,ContractNo,AfterTax,BalanceAmount,InvoiceNo,Email\n";
+            debtData.forEach(item => {
+                csvContent += `"${item.code}","${item.customer}","${item.salesman}","${item.codeSalesman}","${item.dept}","${item.contractNo}",${item.afterTax},${item.balanceAmount},"${item.invoiceNo}","${item.email || ''}"\n`;
+            });
+            const link = document.createElement("a");
+            link.href = encodeURI(csvContent);
+            link.download = `Cong_No_Qua_Han_${new Date().toISOString().slice(0,10)}.csv`;
+            link.click();
+            showToast("Đã xuất tệp CSV!");
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMsg').textContent = msg;
+            toast.classList.remove('hidden');
+            toast.classList.add('flex');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+                toast.classList.remove('flex');
+            }, 3000);
         }
     </script>
 </body>
