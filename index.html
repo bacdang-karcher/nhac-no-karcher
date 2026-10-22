@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- SheetJS (Đọc file Excel) -->
+    <!-- SheetJS (Thư viện đọc file Excel) -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     
     <script>
@@ -282,7 +282,7 @@
 
     <!-- JavaScript Application Logic -->
     <script>
-        // Default Sample Data
+        // Mẫu dữ liệu ban đầu
         let debtData = [
             {
                 code: "CB005908",
@@ -348,7 +348,7 @@
             updateEmailPreview();
         };
 
-        // Đọc tệp Excel xuất từ Fast
+        // Đọc tệp Excel xuất từ Fast - CHỈ LỌC NỢ QUÁ HẠN (Bỏ qua Not due yet)
         function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -361,28 +361,41 @@
                 const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
 
                 debtData = [];
-                for (let i = 2; i < jsonData.length; i++) {
+                for (let i = 3; i < jsonData.length; i++) {
                     const row = jsonData[i];
-                    if (row && row[4] && row[4] !== "Mã khách") {
-                        debtData.push({
-                            code: row[4] || '',
-                            customer: row[5] || '',
-                            salesman: row[16] || '',
-                            codeSalesman: row[15] || '',
-                            dept: 'DN-HOS',
-                            contractNo: row[6] || row[3] || '',
-                            afterTax: Number(row[7]) || 0,
-                            balanceAmount: Number(row[9]) || Number(row[7]) || 0,
-                            invoiceNo: row[3] || '',
-                            email: row[17] || '',
-                            selected: false
-                        });
+                    if (row && row[1]) { // Có Mã khách hàng
+                        
+                        // Cột R (Index 17): Not due yet -> BỎ QUA
+                        // Cột S (Index 18) đến Z (Index 25): Các nhóm nợ QUÁ HẠN
+                        let overdueBalance = 0;
+                        for (let col = 18; col <= 25; col++) {
+                            if (row[col] && !isNaN(row[col])) {
+                                overdueBalance += Number(row[col]);
+                            }
+                        }
+
+                        // CHỈ THÊM VÀO KHI CÓ DƯ NỢ QUÁ HẠN > 0
+                        if (overdueBalance > 0) {
+                            debtData.push({
+                                code: row[1] || '',
+                                customer: row[2] || '',
+                                salesman: row[3] || '',
+                                codeSalesman: row[4] || '',
+                                dept: row[5] || 'SG-HOS',
+                                contractNo: row[6] || '',
+                                afterTax: Number(row[26]) || overdueBalance,
+                                balanceAmount: overdueBalance,
+                                invoiceNo: '',
+                                email: '',
+                                selected: false
+                            });
+                        }
                     }
                 }
 
                 populateCustomerDropdown();
                 renderTable();
-                showToast(`Đã tải thành công ${debtData.length} khoản nợ từ tệp!`);
+                showToast(`Đã lọc thành công ${debtData.length} khoản nợ QUÁ HẠN từ tệp!`);
             };
             reader.readAsArrayBuffer(file);
         }
@@ -528,186 +541,11 @@
                 `;
             });
 
+            // Bỏ phần Kind regards / Tracy Tran ở cuối mail
             const emailTemplate = `
                 <div style="font-family: Arial, sans-serif; font-size: 13px; color: #000; line-height: 1.5;">
                     <p>Kính gửi Quý Công ty,</p>
                     <p style="margin-top: 10px;">Trước tiên, chúng tôi xin cảm ơn Quý Công ty đã luôn tin tưởng và hợp tác cùng <strong>CÔNG TY TNHH MTV KARCHER</strong>.</p>
                     <p style="margin-top: 10px;">Theo đối chiếu công nợ của chúng tôi, hiện tại Quý Công ty vẫn còn một số khoản công nợ quá hạn chưa được thanh toán, chi tiết như sau:</p>
 
-                    <div style="overflow-x: auto; margin-top: 15px; margin-bottom: 15px;">
-                        <table style="width: 100%; border-collapse: collapse; border: 2px solid #000; font-size: 11px;">
-                            <thead>
-                                <tr style="background-color: #FFED00; color: #000; font-weight: bold; border-bottom: 2px solid #000;">
-                                    <th style="padding: 8px 4px; border-right: 1px solid #000; text-align: center;">Code</th>
-                                    <th style="padding: 8px 4px; border-right: 1px solid #000; text-align: center;">Customer</th>
-                                    <th style="padding: 8px 4px; border-right: 1px solid #000; text-align: center;">Sales man</th>
-                                    <th style="padding: 8px 4px; border-right: 1px solid #000; text-align: center;">Code sale man</th>
-                                    <th style="padding: 8px 4px; border-right: 1px solid #000; text-align: center;">Dept</th>
-                                    <th style="padding: 8px 4px; border-right: 1px solid #000; text-align: center;">Contract No</th>
-                                    <th style="padding: 8px 4px; border-right: 1px solid #000; text-align: center;">After tax</th>
-                                    <th style="padding: 8px 4px; border-right: 1px solid #000; text-align: center;">Balance amount</th>
-                                    <th style="padding: 8px 4px; text-align: center;">Invoice No.</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${rowsHtml}
-                                <tr style="background-color: #FFED00; font-weight: bold; border-top: 2px solid #000;">
-                                    <td colspan="5" style="border-right: 1px solid #000;"></td>
-                                    <td style="padding: 8px; border-right: 1px solid #000; color: #d00000;">TỔNG SỐ TIỀN CẦN THANH TOÁN</td>
-                                    <td style="border-right: 1px solid #000;"></td>
-                                    <td style="padding: 8px; border-right: 1px solid #000; text-align: right; color: #d00000;">${formatVND(totalBalance)}</td>
-                                    <td></td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <p>Theo điều khoản thanh toán đã thỏa thuận giữa hai bên, các khoản công nợ trên đã quá hạn thanh toán <strong>${overdueDays} ngày</strong>. Tuy nhiên, đến thời điểm hiện tại, chúng tôi vẫn chưa nhận được khoản thanh toán từ Quý Công ty mặc dù đã nhắc nhở từ trước.</p>
-                    <p style="margin-top: 10px;">Kính mong Quý Công ty vui lòng kiểm tra và sắp xếp thanh toán trong thời gian sớm nhất.</p>
-                    <p style="margin-top: 10px;">Rất mong nhận được sự hỗ trợ và hợp tác từ Quý Công ty.</p>
-                    
-                    <p style="margin-top: 15px;">Kind regards,</p>
-
-                    <div style="margin-top: 15px; font-size: 12px; color: #333;">
-                        <p style="font-weight: bold; color: #000; margin-bottom: 2px;">Tracy Tran</p>
-                        <p style="color: #666; margin: 0;">Senior Accountant</p>
-                        <p style="color: #666; margin: 0;">Finance & Supply Chain</p>
-                        <p style="color: #666; margin: 0;">Phone: <a href="tel:+84901404799" style="color: #0284c7; text-decoration: none;">+84901404799</a></p>
-                    </div>
-                </div>
-            `;
-
-            emailContainer.innerHTML = emailTemplate;
-        }
-
-        function openAddModal() {
-            document.getElementById('editIndex').value = "-1";
-            document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-plus-circle text-karcher-yellow"></i> Thêm khoản nợ mới';
-            document.getElementById('debtForm').reset();
-            document.getElementById('debtModal').classList.remove('hidden');
-            document.getElementById('debtModal').classList.add('flex');
-        }
-
-        function closeAddModal() {
-            document.getElementById('debtModal').classList.add('hidden');
-            document.getElementById('debtModal').classList.remove('flex');
-        }
-
-        function saveDebtItem(event) {
-            event.preventDefault();
-            const editIdx = parseInt(document.getElementById('editIndex').value);
-            
-            const newItem = {
-                code: document.getElementById('inputCode').value,
-                customer: document.getElementById('inputCustomer').value,
-                salesman: document.getElementById('inputSalesman').value,
-                codeSalesman: document.getElementById('inputCodeSalesman').value,
-                dept: document.getElementById('inputDept').value,
-                contractNo: document.getElementById('inputContractNo').value,
-                afterTax: Number(document.getElementById('inputAfterTax').value),
-                balanceAmount: Number(document.getElementById('inputBalance').value),
-                invoiceNo: document.getElementById('inputInvoiceNo').value,
-                email: document.getElementById('inputCustomerEmail').value,
-                selected: true
-            };
-
-            if (editIdx >= 0) {
-                debtData[editIdx] = newItem;
-                showToast("Đã cập nhật thông tin khoản nợ!");
-            } else {
-                debtData.push(newItem);
-                showToast("Đã thêm khoản nợ mới!");
-            }
-
-            closeAddModal();
-            populateCustomerDropdown();
-            renderTable();
-        }
-
-        function editDebtItem(index) {
-            const item = debtData[index];
-            document.getElementById('editIndex').value = index;
-            document.getElementById('modalTitle').innerHTML = '<i class="fa-solid fa-pen-to-square text-karcher-yellow"></i> Chỉnh sửa khoản nợ';
-            
-            document.getElementById('inputCode').value = item.code;
-            document.getElementById('inputCustomer').value = item.customer;
-            document.getElementById('inputSalesman').value = item.salesman;
-            document.getElementById('inputCodeSalesman').value = item.codeSalesman;
-            document.getElementById('inputDept').value = item.dept;
-            document.getElementById('inputContractNo').value = item.contractNo;
-            document.getElementById('inputAfterTax').value = item.afterTax;
-            document.getElementById('inputBalance').value = item.balanceAmount;
-            document.getElementById('inputInvoiceNo').value = item.invoiceNo;
-            document.getElementById('inputCustomerEmail').value = item.email || '';
-
-            document.getElementById('debtModal').classList.remove('hidden');
-            document.getElementById('debtModal').classList.add('flex');
-        }
-
-        function deleteDebtItem(index) {
-            if (confirm("Bạn có chắc chắn muốn xóa khoản nợ này?")) {
-                debtData.splice(index, 1);
-                populateCustomerDropdown();
-                renderTable();
-                showToast("Đã xóa khoản nợ!");
-            }
-        }
-
-        function copyEmailHTML() {
-            const container = document.getElementById('emailPreviewContent');
-            if (!container || debtData.filter(d => d.selected).length === 0) {
-                showToast("Không có nội dung email để sao chép!");
-                return;
-            }
-
-            const range = document.createRange();
-            range.selectNode(container);
-            window.getSelection().removeAllRanges();
-            window.getSelection().addRange(range);
-
-            try {
-                document.execCommand('copy');
-                showToast("Đã sao chép nội dung Email!");
-            } catch (err) {
-                showToast("Lỗi khi sao chép!");
-            }
-            window.getSelection().removeAllRanges();
-        }
-
-        function openMailClient() {
-            const selectedItems = debtData.filter(d => d.selected);
-            if (selectedItems.length === 0) {
-                showToast("Vui lòng chọn khách hàng để gửi email!");
-                return;
-            }
-
-            const recipient = selectedItems[0].email || '';
-            const subject = encodeURIComponent(document.getElementById('emailSubject').textContent.trim());
-            window.open(`mailto:${recipient}?subject=${subject}`, '_blank');
-        }
-
-        function exportToCSV() {
-            let csvContent = "data:text/csv;charset=utf-8,\uFEFFCode,Customer,Salesman,CodeSalesman,Dept,ContractNo,AfterTax,BalanceAmount,InvoiceNo,Email\n";
-            debtData.forEach(item => {
-                csvContent += `"${item.code}","${item.customer}","${item.salesman}","${item.codeSalesman}","${item.dept}","${item.contractNo}",${item.afterTax},${item.balanceAmount},"${item.invoiceNo}","${item.email || ''}"\n`;
-            });
-            const link = document.createElement("a");
-            link.href = encodeURI(csvContent);
-            link.download = `Cong_No_Qua_Han_${new Date().toISOString().slice(0,10)}.csv`;
-            link.click();
-            showToast("Đã xuất tệp CSV!");
-        }
-
-        function showToast(msg) {
-            const toast = document.getElementById('toast');
-            document.getElementById('toastMsg').textContent = msg;
-            toast.classList.remove('hidden');
-            toast.classList.add('flex');
-            setTimeout(() => {
-                toast.classList.add('hidden');
-                toast.classList.remove('flex');
-            }, 3000);
-        }
-    </script>
-</body>
-</html>
+                    <div
